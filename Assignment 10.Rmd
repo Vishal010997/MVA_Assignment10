@@ -1,0 +1,365 @@
+---
+title: "Assignment 10"
+output: html_document
+date: "2024-04-25"
+---
+
+```{r}
+library(readr)
+library(MASS)
+library(ggplot2)
+library(memisc)
+library(ROCR)
+library(dplyr)
+library(klaR)
+# Read the CSV file
+df <- read_csv("C:/Rutgers/Subjects/Spring Sem/Multivariate Analysis/Data/wine.csv")
+
+#dataframe
+df
+df1 <- as.matrix(df[,c(1:11)])
+df1
+```
+```{r}
+df_new <- cbind(df1, as.numeric(as.factor(df$quality))-1)
+```
+```{r}
+df_new
+colnames(df_new)[12] <- "quality"
+df_new
+```
+
+```{R}
+
+
+df_new_size <- floor(0.75 * nrow(df_new))
+df_new_size
+
+train_df_raw <- sample(nrow(df_new), size = df_new_size)
+train_df_raw
+
+train_raw.df <- as.data.frame(df_new[train_df_raw, ])
+train_raw.df
+
+test_raw.df <- as.data.frame(df_new[-train_df_raw, ])
+test_raw.df
+```
+
+```{r}
+df.lda <- lda(formula = train_raw.df$quality ~ ., data = train_raw.df)
+df.lda
+
+```
+```{R}
+train_raw.df$quality
+summary(df.lda)
+print(df.lda)
+par(mar = c(5, 5, 2, 2))  # Set margin size (bottom, left, top, right)
+plot(df.lda)
+
+```
+
+
+```{r}
+df.lda.predict <- predict(df.lda, newdata = test_raw.df)
+df.lda.predict$class
+df.lda.predict$x
+
+
+```
+```{R}
+# Get the posteriors as a dataframe.
+df.predict.posteriors <- as.data.frame(df.lda.predict$posterior)
+df.predict.posteriors
+pred <- prediction(df.predict.posteriors[,2], test_raw.df$quality)
+pred
+
+colnames(df.predict.posteriors)
+str(df.predict.posteriors)
+head(df.predict.posteriors)
+```
+
+
+```{r}
+roc.perf = performance(pred, measure = "tpr", x.measure = "fpr")
+auc.train <- performance(pred, measure = "auc")
+auc.train <- auc.train@y.values
+plot(roc.perf)
+abline(a=0, b= 1)
+text(x = .25, y = .65 ,paste("AUC = ", round(auc.train[[1]],3), sep = ""))
+```
+
+
+```{R}
+# Read the CSV file
+df <- read_csv("C:/Rutgers/Subjects/Spring Sem/Multivariate Analysis/Data/wine_new.csv")
+
+# Select specific columns by names
+df <- df[c("alcohol","volatile acidity","quality")]
+df
+```
+
+
+1) Model Development (2 points)
+
+Prior Probabilities: These represent the class proportions in the dataset. Notably, "Average" and "Good" classes dominate, while "Bad" is rare.
+
+
+Group Means: Average alcohol and volatile acidity levels vary across quality classes.
+
+
+Coefficients of Linear Discriminants: Alcohol positively influences LD1, while volatile acidity negatively affects both LD1 and LD2.
+
+Proportion of Trace: LD1 explains most variance (95%), indicating its importance in class separation.
+
+
+In summary, alcohol and volatile acidity significantly influence quality class discrimination, with alcohol predominantly shaping LD1, while both variables contribute to LD2.
+```{R}
+
+r <- lda(formula = quality ~ ., data = df)
+r
+
+```
+
+2) Model Acceptance (2 points)
+
+Prior Probabilities of Groups: The prior probabilities indicate the proportion of each quality class in the dataset. "Average" and "Good" classes are most prevalent, while "Bad" is rarest.
+
+
+Group Means: Average alcohol and volatile acidity levels differ across quality classes. For instance, "Excellent" quality wines have the highest alcohol content on average.
+
+
+Coefficients of Linear Discriminants: The coefficients show the weights assigned to each predictor variable (alcohol and volatile acidity) in the linear combination used for classification. 
+
+Higher alcohol content and lower volatile acidity contribute positively to LD1.
+
+
+Proportion of Trace: LD1 explains approximately 95% of the total variance, suggesting its significance in class separation. LD2 explains the remaining 5%.
+```{R}
+summary(r)
+print(r)
+r$counts
+r$means
+r$scaling
+r$prior
+r$lev
+r$svd
+```
+```{r}
+#singular values (svd) that gives the ratio of the between- and within-group standard deviations on the linear discriminant variables.
+r$N
+r$call
+(prop = r$svd^2/sum(r$svd^2))
+
+
+
+```
+
+
+```{r}
+#we can use the singular values to compute the amount of the between-group variance that is explained by each linear discriminant. In our example we see that the first linear discriminant explains more than 99% of the between-group variance in the iris dataset.
+r2 <- lda(formula = quality ~ ., data = df, CV = TRUE)
+r2
+```
+```{R}
+attach(df)
+head(r2$class)
+#the Maximum a Posteriori Probability (MAP) classification (a factor)
+#posterior: posterior probabilities for the classes.
+head(r2$posterior, 3)
+train <- sample(1:150, 75)
+train
+# Assuming `train` is a vector of indices
+train_indices <- train
+train_df <- df[train_indices, ]
+
+# Calculate prior probabilities
+unique_classes <- unique(train_df$quality)
+num_classes <- length(unique_classes)
+prior <- rep(1/num_classes, num_classes)
+
+# Train the LDA model
+r3 <- lda(quality ~ ., 
+          train_df,
+          prior = prior)
+
+
+```
+
+4) Prediction (2 points)
+
+
+Observation 1 has a high LD1 value and a moderate LD2 value, suggesting a higher probability of belonging to the "Average" quality class.
+
+
+Observation 2 has a moderate LD1 value and a negative LD2 value, suggesting a higher probability of belonging to the "Poor" quality class.
+
+
+Observation 3 has a negative LD1 value and a high LD2 value, indicating a higher probability of belonging to the "Very Good" quality class.
+
+
+Observation 4 has a moderate LD1 value and a moderate LD2 value, suggesting a higher probability of belonging to the "Average" quality class.
+
+
+Observation 5 has a high LD1 value and a negative LD2 value, indicating a higher probability of belonging to the "Average" quality class.
+
+
+Observation 6 has a negative LD1 value and a positive LD2 value, suggesting a higher probability of belonging to the "Good" quality class.
+```{r}
+plda = predict(object = r3, # predictions
+               newdata = df[-train, ])
+head(plda$class)
+head(plda$posterior, 6) # posterior prob.
+head(plda$x, 3)
+plot(r)
+plot(r3)
+
+```
+
+
+```{R}
+r <- lda(quality ~ .,
+         train_df,
+         prior = prior)
+prop.lda = r$svd^2/sum(r$svd^2)
+plda <- predict(object = r,
+                newdata = df)
+
+
+```
+```{r}
+dataset = data.frame(species = df[,"quality"],lda = plda$x)
+ggplot(dataset) + geom_point(aes(lda.LD1, lda.LD2, colour = quality, shape = quality), size = 2.5) + labs(x = paste("LD1 (", percent(prop.lda[1]), ")", sep=""),y = paste("LD2 (", percent(prop.lda[2]), ")", sep=""))
+```
+
+
+
+
+```{R}
+# lets play with accuracy
+# lets look at another way to divide a dataset
+
+set.seed(101) # Nothing is random!!
+sample_n(df,10)
+# Lets take a sample of 75/25 like before. Dplyr preserves class. 
+training_sample <- sample(c(TRUE, FALSE), nrow(df), replace = T, prob = c(0.75,0.25))
+train <- df[training_sample, ]
+test <- df[!training_sample, ]
+#lets run LDA like before
+lda.df <- lda(quality ~ ., train)
+# do a quick plot to understand how good the model is
+plot(lda.df, col = as.integer(train$quality))
+# Sometime bell curves are better
+# Set outer margin to zero
+par(oma = c(0, 0, 0, 0))
+
+# Set inner margin to a smaller value
+par(mar = c(2, 2, 2, 2))
+```
+```{r}
+# Set outer margin to zero
+par(oma = c(0, 0, 0, 0))
+
+# Set inner margin to a smaller value
+par(mar = c(2, 2, 2, 2))
+
+# Set the plot region directly
+par(plt = c(0.1, 0.9, 0.1, 0.9))
+
+# Plot the LDA result
+plot(lda.df, dimen = 1, type = "b")
+
+# Reset plotting parameters
+par(oma = c(0, 0, 0, 0))
+par(mar = c(5, 4, 4, 2) + 0.1)  # Reset to default values
+```
+```{r}
+
+attach(train)
+train
+```
+
+3) Residual Analysis (2 points)
+
+The residual analysis for the predictor variable "volatile acidity" reveals significant variability in the response variable "quality" that is not explained by this predictor.
+
+The residual sum of squares (SS) is 30.4343, indicating the total unexplained variability in the response variable after accounting for "volatile acidity."
+
+
+The mean square (MS) represents the average unexplained variability per degree of freedom, which is 0.02677.
+
+
+The associated F-value (F) is 47.938, indicating that there is a significant difference in the mean response variable among the groups defined by "quality."
+
+
+The p-value (Pr(>F)) is less than 2.2e-16, indicating strong evidence against the null hypothesis. This suggests that "volatile acidity" significantly influences the quality of the product.
+
+
+Overall, the residual analysis underscores the importance of "volatile acidity" as a predictor of product quality. However, it also implies that other factors not included in the model may contribute to the remaining variability in product quality. 
+
+Further investigation or refinement of the model may be necessary to capture these additional influences.
+
+
+
+5) Model Accuracy (2 points)
+Df (Degrees of Freedom):
+For the factor "quality": 5 degrees of freedom, representing the number of quality levels minus 1.
+
+
+For residuals: 1137 degrees of freedom, representing the error or unexplained variability.
+
+
+Sum Sq (Sum of Squares):
+
+For the factor "quality": 356.83, which is the variability in alcohol content explained by the quality levels.
+For residuals: 980.62, which is the unexplained variability or error.
+
+
+Mean Sq (Mean Square):
+
+For the factor "quality": 71.366, which is the average amount of variability in alcohol content explained by the quality levels.
+
+
+For residuals: 0.862, which is the average amount of unexplained variability or error.
+
+
+F value (F-statistic):
+
+This value tests the null hypothesis that there is no relationship between alcohol content and quality levels.
+The obtained F value of 82.747 is highly significant (p < 0.05), indicating strong evidence against the null hypothesis.
+
+
+Pr(>F) (p-value):
+
+This is the probability of observing an F statistic as extreme as the one obtained if the null hypothesis were true.
+
+The very small p-value (< 2.2e-16) indicates strong evidence against the null hypothesis, suggesting a significant relationship between alcohol content and quality levels.
+
+Overall, the ANOVA results suggest that alcohol content significantly influences the quality levels of the observations.
+
+```{r}
+# Reset to default values
+# THis plot shows the essense of LDA. It puts everything on a line and finds cutoffs. 
+# Partition plots
+# Print the column names of the train data frame
+train$quality <- factor(train$quality)
+
+partimat(train$quality ~ train$alcohol + train$`volatile acidity` , data=train, method="lda")
+
+
+# Lets focus on accuracy. Table function
+lda.train <- predict(lda.df)
+train$lda <- lda.train$class
+table(train$lda,train$quality)
+# running accuracy on the training set shows how good the model is. It is not an indication of "true" accuracy. We will use the test set to approximate accuracy
+lda.test <- predict(lda.df,test)
+test$lda <- lda.test$class
+table(test$lda,test$quality)
+
+
+# Wilk's Lambda and F test for each variablw
+m <- manova(cbind(alcohol,`volatile acidity`)~quality,data=df)
+summary(m,test="Wilks")
+summary(m,test="Pillai")
+summary.aov(m)
+```
